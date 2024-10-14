@@ -1,51 +1,191 @@
-import React, { useEffect, useState } from 'react';
-import axios from 'axios';
-import { Collapse, Button } from 'antd';
-import mockFAQs from './mockFAQs'; // Import the mock JSON File
-import './FAQ.css'; // Import the CSS file
+import React, { useRef, useState } from "react";
+import { Button, IconButton, TextField, MenuItem } from "@mui/material";
+import AttachmentIcon from "@mui/icons-material/Attachment";
+import DeleteIcon from "@mui/icons-material/Delete";
 
-const { Panel } = Collapse;
+const subjects = ["Math", "Science", "History"]; // Example subjects
+const grades = ["Grade 1", "Grade 2", "Grade 3"]; // Example grades
 
-function FAQ() {
-  const [faqs, setFaqs] = useState([]);
+function FileUpload({ accept, onSelectFile, onDeleteFile, disabled }) {
+  const hiddenFileInput = useRef(null);
+  const [file, setFile] = useState(null);
+  const [fileName, setFileName] = useState("");
+  const [subject, setSubject] = useState("");
+  const [grade, setGrade] = useState("");
+  const [year, setYear] = useState(new Date().getFullYear());
+  const [category, setCategory] = useState("");
+  const [description, setDescription] = useState("");
+  const [errors, setErrors] = useState({});
 
-  useEffect(() => {
-    // Fetch FAQs from the API
-    /**axios.get('/api/faqs')
-      .then(response => setFaqs(response.data))
-      .catch(error => console.error('Error fetching FAQs:', error));
-      */
+  const handleClick = () => {
+    hiddenFileInput.current.click();
+  };
 
-    // Use mock data for testing
-    setFaqs(mockFAQs);
-  }, []);
+  const handleChange = (event) => {
+    const selectedFile = event.target.files;
+    if (selectedFile) {
+      if (selectedFile.size > 30 * 1024 * 1024) { // 30MB size limit
+        setErrors({ ...errors, file: "File too large" });
+      } else if (!accept.includes(selectedFile.type)) {
+        setErrors({ ...errors, file: "Incorrect file type" });
+      } else {
+        setFile(selectedFile);
+        setFileName(selectedFile.name);
+        onSelectFile(selectedFile);
+        setErrors({ ...errors, file: null });
+      }
+    }
+  };
+
+  const handleDelete = () => {
+    setFile(null);
+    setFileName("");
+    hiddenFileInput.current.value = null;
+    onDeleteFile();
+  };
+
+  const handleSubmit = async () => {
+    const newErrors = {};
+    if (!file) newErrors.file = "File is required";
+    if (!fileName) newErrors.fileName = "File name is required";
+    if (fileName.length < 5 || fileName.length > 50) newErrors.fileName = "File name must be between 5 and 50 characters";
+    if (!subject) newErrors.subject = "Subject is required";
+    if (subject.length < 2 || subject.length > 25) newErrors.subject = "Subject must be between 2 and 25 characters";
+    if (!grade) newErrors.grade = "Grade is required";
+    if (!grades.includes(grade)) newErrors.grade = "Grade must be a valid grade";
+    if (!year) newErrors.year = "Year is required";
+    if (year < 2000 || year > new Date().getFullYear()) newErrors.year = "Year must be between 2000 and the current year";
+    if (!category) newErrors.category = "Category is required";
+    if (category.length < 5 || category.length > 20) newErrors.category = "Category must be between 5 and 20 characters";
+    if (!description) newErrors.description = "Description is required";
+    if (description.length > 300) newErrors.description = "Description must be less than 300 characters";
+    setErrors(newErrors);
+
+    if (Object.keys(newErrors).length === 0) {
+      // Submit form
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("fileName", fileName);
+      formData.append("subject", subject);
+      formData.append("grade", grade);
+      formData.append("year", year);
+      formData.append("category", category);
+      formData.append("description", description);
+
+      try {
+        const response = await fetch("/api/uploads", {
+          method: "POST",
+          body: formData,
+        });
+        const result = await response.json();
+        if (response.ok) {
+          console.log("File uploaded successfully", result);
+        } else {
+          console.error("File upload failed", result);
+        }
+      } catch (error) {
+        console.error("File upload failed", error);
+      }
+    }
+  };
 
   return (
-    <div id="faq" className="faqs">
-      <div className="container-fluid">
-        <div className="titleHolder">
-          <h2>Frequently Asked Questions</h2>
-        </div>
-        {faqs.map((category, index) => (
-          <div key={index} className="faqCategory">
-            <h3>{category.category}</h3>
-            <Collapse defaultActiveKey={['0']}>
-              {category.questions.map((faq, idx) => (
-                <Panel header={faq.question} key={idx}>
-                  <p>{faq.answer}</p>
-                </Panel>
-              ))}
-            </Collapse>
+    <div className="file-uploader">
+      <div className={`file-div ${disabled && "disabled"}`}>
+        <Button onClick={handleClick} disabled={disabled}>
+          <AttachmentIcon />
+          <input
+            type="file"
+            accept={accept}
+            ref={hiddenFileInput}
+            onChange={handleChange}
+            hidden
+            disabled={disabled}
+          />
+          <div className="file-name">
+            {file ? <div>{file.name}</div> : <div>Choose file</div>}
           </div>
-        ))}
-        <div className="quickSupport">
-          <h3>Want quick support?</h3>
-          <p>Get quick support 24/7 with our dedicated users service team. We are here to help you get resources, answer any questions, and resolve any issues. Trust us to make your experience stress-free and enjoyable.</p>
-          <Button type="primary" size="large" href="mailto:s2t@nwu.ac.za"><i className="fas fa-envelope"></i> Email your question</Button>
-        </div>
+        </Button>
+        {errors.file && <div className="error">{errors.file}</div>}
       </div>
+      <TextField
+        label="File Name"
+        value={fileName}
+        onChange={(e) => setFileName(e.target.value)}
+        disabled={disabled}
+        error={!!errors.fileName}
+        helperText={errors.fileName}
+      />
+      <TextField
+        select
+        label="Subject"
+        value={subject}
+        onChange={(e) => setSubject(e.target.value)}
+        disabled={disabled}
+        error={!!errors.subject}
+        helperText={errors.subject}
+      >
+        {subjects.map((option) => (
+          <MenuItem key={option} value={option}>
+            {option}
+          </MenuItem>
+        ))}
+      </TextField>
+      <TextField
+        select
+        label="Grade"
+        value={grade}
+        onChange={(e) => setGrade(e.target.value)}
+        disabled={disabled}
+        error={!!errors.grade}
+        helperText={errors.grade}
+      >
+        {grades.map((option) => (
+          <MenuItem key={option} value={option}>
+            {option}
+          </MenuItem>
+        ))}
+      </TextField>
+      <TextField
+        label="Year"
+        type="number"
+        value={year}
+        onChange={(e) => setYear(e.target.value)}
+        disabled={disabled}
+        error={!!errors.year}
+        helperText={errors.year}
+      />
+      <TextField
+        label="Category"
+        value={category}
+        onChange={(e) => setCategory(e.target.value)}
+        disabled={disabled}
+        error={!!errors.category}
+        helperText={errors.category}
+      />
+      <TextField
+        label="Description"
+        value={description}
+        onChange={(e) => setDescription(e.target.value)}
+        disabled={disabled}
+        error={!!errors.description}
+        helperText={errors.description}
+        multiline
+        rows={4}
+      />
+      <IconButton
+        aria-label="delete"
+        disabled={disabled}
+        color="primary"
+        onClick={handleDelete}
+      >
+        <DeleteIcon />
+      </IconButton>
+      <Button onClick={handleSubmit} disabled={disabled}>
+        Upload
+      </Button>
     </div>
   );
 }
 
-export default FAQ;
+export default FileUpload;
