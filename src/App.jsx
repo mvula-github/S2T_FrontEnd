@@ -19,14 +19,14 @@ function App() {
     <>
       <div className='app-container'>
         <Landing />
-        {/*<FAQ />*/}
+        <FAQ />
 
-        <FileUpload
+        {/*<FileUpload
                 accept=".pdf,.doc,.docx" //Define the accepted file types
                 onSelectFile={handleSelectFile}
                 onDeleteFile={handleDeleteFile}
                 disabled={false} 
-        />
+        />*/}
 
         {/*<Moderate/>*/}
 
